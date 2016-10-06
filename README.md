@@ -1,12 +1,11 @@
 #GMTPLOT 0.90
 
  Creates a quick plot from a netcdf file using GMT and cdo
- Written by: Jost von Hardenberg <j.vonhardenberg@isac.cnr.it> 2012
 
 ##Dependencies
  -  [GMT](http://gmt.soest.hawaii.edu/)
  -  [cdo](https://code.zmaw.de/projects/cdo) 
- -  [ps2epsi] (http://www.ghostscript.com/)
+ -  [ps2epsi](http://www.ghostscript.com/)
 
 ##Description
 
@@ -117,3 +116,5 @@ such as those produced by some regional models.
 If this happens, you could first reinterpolate to a regular grid 
 using the -remap option. E.g. -remap 720/720
 
+##Contact
+(c) 2012-2016 Jost von Hardenberg (jvonhardenberg AT isac.cnr.it) - ISAC-CNR, Italy
