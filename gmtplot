@@ -1,0 +1,520 @@
+#!/bin/bash
+##############################################################################
+## GMTPLOT 0.90
+## Creates a quick plot from a netcdf file using GMT and cdo
+## Written by: Jost von Hardenberg <j.vonhardenberg@isac.cnr.it> 2012-2016
+##
+## Dependencies: GMT (http://gmt.soest.hawaii.edu/)
+## 		 cdo (https://code.zmaw.de/projects/cdo)
+##		 ps2epsi
+## 
+## MIT License
+##
+## Copyright (c) 2016 Jost von Hardenberg - ISAC-CNR
+## 
+## Permission is hereby granted, free of charge, to any person obtaining a copy
+## of this software and associated documentation files (the "Software"), to deal
+## in the Software without restriction, including without limitation the rights
+## to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+## copies of the Software, and to permit persons to whom the Software is
+## furnished to do so, subject to the following conditions:
+##
+## The above copyright notice and this permission notice shall be included 
+## in all copies or substantial portions of the Software.
+##
+## THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+## IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+## FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+## AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+## LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+## OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+## SOFTWARE.
+##    
+##############################################################################
+
+#set -exv
+export LANG=en_US.utf-8
+export LC_ALL=en_US.utf-8 
+
+GMTVER=$(gmt --version 2>&1  | head -1 | cut -f 3 -d" "| cut -f 1 -d.)
+
+if [ $GMTVER == 5 ]; then
+GMTPRE=gmt
+GMTDIR=$(which gmt)
+GMTDIR=${GMTDIR%/*}
+GMTDIR=${GMTDIR%/*}/share/cpt
+#PATH=/opt/gmt5/bin:$PATH
+NATIONALDEF="-N1/1p"
+else
+GMTPRE=
+GMTDIR=$(which gmt)
+GMTDIR=${GMTDIR%/*}
+GMTDIR=${GMTDIR%/*}/share/gmt4/cpt
+#GMTDIR=/usr/lib/gmt
+NATIONALDEF="-N1/3"
+fi
+
+#NCVAR=tp
+#UNITS="mm/day"
+#TITLE="Average precipitation 1998-2008"
+#CMIN=0
+#CMAX=15
+#CSTEP=0.1
+#CSTEP2=2
+#CMAP="GMT_whiterain.cpt"
+TFILE=temp$$.nc
+TFILE2=tempb$$.nc
+CMAP="rainbow"
+GRID=60g30
+COORD=""
+TIMESTEP=1
+REMAP=""
+NOCOLORBAR=0
+VSCALEOFF=-0.4
+COASTDETAIL=l
+NATIONAL="undef"
+DEBUG=0
+EPSONLY=0
+PNGONLY=0
+DENSITY=144
+CUSTOMCMD=""
+CONTOUR=0
+CONTOURLINES=""
+HEADER_FONT_SIZE=18
+ANNOT_FONT_SIZE=12
+LISTCMAP=0
+FONT="Helvetica-Bold"
+MINAREA=2500
+VECTOR=""
+VECTSCALE=1
+REFVECT=1
+VECTUNITS=""
+NOCLOSE=0
+NOPLOT=0
+CONTINUE=0
+NANCOLOR=128/128/128
+TEXT=""
+SEA=""
+
+if [ $# -lt 1 ] ; then
+	cat << END
+ gmtplot 0.87
+ Creates a quick plot from a netcdf file using GMT and cdo
+ Written by: Jost von Hardenberg <j.vonhardenberg@isac.cnr.it> 2012
+
+ Dependencies: GMT (http://gmt.soest.hawaii.edu/)
+     	       cdo (https://code.zmaw.de/projects/cdo)
+
+ Usage: gmtplot inputfile outputprefix [options]
+	inputfile    	input netcdf file
+	outputprefix	prefix for output files (e.g. "test" will create test.png and test.eps)	
+
+	Options:
+	-var string	select variable "string". 
+			Default: select first variable in input file
+	-timestep value 
+			select a timestep in input file. Default: first timestep 
+	-title string	Title for plot. Default: nothing		
+	-cmin value	minimum value for colormap.
+			Default: automatic from file
+	-cmax value	maximum value for colormap. 
+	                Default: automatic from file
+	-cstep value	step to use for colors. Default: (cmax-cmin)/200
+	-cstepbar value	
+			steps to mark in colobar. Default: (cmax-cmin)/5
+	-cmap string	GMT colormap to be used. Default: rainbow
+			You can use either a filename or a standard name:
+       			Check 	http://geodynamics.usc.edu/~becker/igmt/data/schemes.pdf
+				http://soliton.vm.bytemark.co.uk/pub/cpt-city/gmt/index.html
+			Try string=whiterain for precipitation
+        -listcmap       Lists available colormaps 
+        -contour	Use filled contours instead of raster to plot image.
+                        The contour interval is cstep
+        -contourlines value	Plot discrete contour lines at interval value
+        -font	value	The font for annotations and title. Default Helvetica-Bold. 
+                        Please see "man gmtdefaults" or 
+                        http://gmt.soest.hawaii.edu/gmt/html/man/gmtdefaults.html for a list of fonts.
+        -fontsize value	Font size for annotations. Default 12
+        -fontsizetitle value	Font size for title. Default 18
+	-nocolorbar	switches off colorbar
+	-units string	Units for colorbar. 
+			Default: read from netcdf file ("units" attribute)
+	-R     string
+ 	-proj  string
+	-coord string   Type of projection and region to plot: string=
+			robinson	Robinson global projection (Default)
+			lonlat
+			latlon
+			globe
+			cylindrical	Cylindrical equidistant global projection - Plate Carrée
+			arctic		Polar stereographic projection (arctic 60:90N)
+			antarctic	Polar stereographic projection (antarctic -60:-90S) 
+			eurocordex-int	Custom Euro-CORDEX oblique mercator projection
+			eurocordex	Custom Euro-CORDEX oblique mercator projection
+			eurocordex-ext	Custom Euro-CORDEX oblique mercator projection (ext domain)
+			x1/x2/y1/y2  	Plot a selected region (cylindrical) 
+	-grid  X/Y 	Grid spacing in x and y direction. E.g. -grid 60/30.
+			Default: 60/30
+	-coast string	Level of detail for coastlines: string=
+			c = coarse
+			l = low (default)
+			i = intermediate
+			h = high (not implemented)
+			f = full (not implemented)
+        -minarea value	Minimum area of features in sq. Km (Default 2500)
+	-nonational	Do not plot national boundaries (default for global maps)
+	-national	Do plot national boundaries (default for regional maps)
+	-remap X/Y  	Remap to a regular grid with X and Y grid points in the 
+			longitudinal and latitudinal directions.
+			E.g.: "-remap 720/720" remaps to a r720x720 grid first
+	-eps		create only eps output graphic (default is both png and eps)
+	-png		create only png output graphic (default is both png and eps)
+	-density value	Density in PPI for output png (default is 144)	
+        -custom	string	Custom CDO command to apply to input field, e.g. -custom divc,3
+	-vector	file	Overlays vector plot from file. Default u and v component names are "u" and "v"
+	-vectorscale value  Scale for vector (Units: degrees/data units, default 1) 
+	-refvector value  Modulus of vector plotted for reference  (Default: 1) 
+        -vectorunits string  Units to label the reference vector (Default: -units)
+        -keep	 	Do not close ps, another plot will follow (creates a .ps)
+        -continue	Continue open plot left by previous -keep
+        -noplot 	Do NOT plot inputfile, useful to plot only contours or an empty map
+        -nancolor string      Set color for NANs, eg. : -nancolor 128/128/128 (Default)
+        -text string/X/Y/FS   Places a string at position X/Y with fontsize FS
+        -sea color      Set wet areas (ocean) to color (e.g. -sea blue or -sea 0/0/255)
+
+Description: 
+       This idea for this tool is to create quickly a 'first guess' plot of the contents of 
+       a netcdf file. Since it uses GMT the output plots are high quality and could be used
+       for a publication. 
+       The options allow a certain degree of customization (they are limited on purpouse). 
+       If you need more and know how to use GMT you can modify this script to suit your needs.
+
+       gmtplot test.nc myplot 
+          Default plot of first variable in test.nc using defaults. 
+          Creates myplot.eps and myplot.png
+
+       gmtplot trmm.nc myplot -var precipitation -timestep 1 -cmin 0 -cmax 2 -cstep 0.01 -cstepbar 0.5 -title "TRMM yearly average precip." -cmap ./GMT_whiterain.cpt -coord -20/50/20/50 -units "mm/hr" -grid 15/15
+
+       	   Plots TRMM rainfall over the Mediterranean using the "GMT_whiterain.cpt" 
+	   palette file, overriding some defaults.
+
+Notes: 
+        GMT appears to have problems with some datasets with a curvilinear grid, 
+	such as those produced by some regional models.
+        If this happens, you could first reinterpolate to a regular grid 
+	using the -remap option. E.g. -remap 720/720
+
+END
+	exit 1
+fi
+
+IFILE=$1
+OOFILE=$2
+shift 2
+while [ $# -gt 0 ] ; do
+	case $1 in
+		-var) NCVAR=$2 ; shift 2 ;;
+		-cmin) CMIN=$2 ; shift 2 ;;
+		-cmax) CMAX=$2 ; shift 2 ;;
+		-cstep) CSTEP=$2 ; shift 2 ;;
+		-cstepbar) CSTEP2=$2 ; shift 2 ;;
+		-title) TITLE=$2 ; shift 2 ;;
+		-cmap) CMAP=$2 ; shift 2 ;;
+		-contour) CONTOUR=1 ; shift 1 ;;
+		-contourlines) CONTOURLINES=$2 ; shift 2 ;;
+                -minarea) MINAREA=$2 ; shift 2 ;;
+		-listcmap) LISTCMAP=1 ; shift 1 ;;
+		-fontsize) ANNOT_FONT_SIZE=$2 ; shift 2 ;;
+		-fontsizetitle) HEADER_FONT_SIZE=$2 ; shift 2 ;;
+		-font) FONT=$2 ; shift 2 ;;
+		-coord) COORD=$2 ; shift 2 ;;
+		-R) COORD=$2 ; shift 2 ;;
+		-proj) COORD=$2 ; shift 2 ;;
+		-units) UNITS=$2 ; shift 2 ;;
+		-grid) GRID=${2//\//g} ; shift 2 ;;
+		-timestep) TIMESTEP=$2 ; shift 2 ;;
+		-nocolorbar) NOCOLORBAR=1 ; shift 1 ;;
+		-epsonly) EPSONLY=1 ; shift 1 ;;
+		-pngonly) PNGONLY=1 ; shift 1 ;;
+		-nonational) NATIONAL="" ; shift 1 ;;
+		-national) NATIONAL=$NATIONALDEF ; shift 1 ;;
+		-remap) REMAP=${2//\//x} ; shift 2 ;;
+		-debug) DEBUG=1 ; shift 1 ;;
+		-eps) EPSONLY=1 ; shift 1 ;;
+		-png) PNGONLY=1 ; shift 1 ;;
+		-coast) COASTDETAIL=$2 ; shift 2 ;;
+		-density) DENSITY=$2 ; shift 2 ;;
+		-custom) CUSTOMCMD=$2 ; shift 2 ;;
+		-vector) VECTOR=$2 ; shift 2 ;;
+		-vectorscale) VECTSCALE=$2 ; shift 2 ;;
+		-refvector) REFVECT=$2 ; shift 2 ;;
+		-vectorunits) VECTUNITS=$2 ; shift 2 ;;
+		-keep) NOCLOSE=1 ; shift 1 ;;
+		-continue) CONTINUE=1 ; shift 1 ;;
+		-noplot) NOPLOT=1 ; shift 1 ;;
+		-nancolor) NANCOLOR=$2 ; shift 2 ;;
+		-text) TEXT=$2 ; shift 2 ;;
+		-sea) SEA=$2 ; shift 2 ;;
+		*) shift 1 ;;
+	esac
+done
+
+if [ $NOPLOT == 1 ]; then 
+    NOCOLORBAR=1
+fi
+
+if [ $NOCLOSE == 1 ]; then 
+    EPSONLY=1
+fi
+
+if [ $LISTCMAP == 1 ]; then 
+   ls $GMTDIR
+   exit
+fi
+
+if [ "$REMAP" != "" ]; then 
+   REMAPCMD="-remapbil,r$REMAP"
+else
+   REMAPCMD=""
+fi
+
+if [ "$CUSTOMCMD" != "" ]; then
+   CUSTOMCMD="-$CUSTOMCMD"
+else
+   CUSTOMCMD=""
+fi
+
+if [ "$SEA" != "" ]; then
+   SEA="-S$SEA"
+fi
+
+if [ ! -n "$NCVAR" ]; then
+    NCVAR=`cdo -s showname $IFILE`
+    NCVAR=(${NCVAR// / })
+fi
+if [ "$COORD" == "" ] || [ $COORD == mollweide ] ||  [ $COORD == robinson ] || [ $COORD == cylindrical ] || [ $COORD == lonlat ] || [ $COORD == latlon ]; then 
+#   echo Global coords defined : $COORD
+   cdo -s selname,$NCVAR $CUSTOMCMD $REMAPCMD -seltimestep,$TIMESTEP $IFILE $TFILE
+   if [ "$NATIONAL" == "undef" ]; then
+	NATIONAL=""
+   fi
+   COASTDETAIL=c
+elif  [ "$COORD" == "arctic" ]; then
+   cdo -s seltimestep,$TIMESTEP -selname,$NCVAR $IFILE $TFILE2
+   cdo -s $CUSTOMCMD -remapbic,r720x720 -sellonlatbox,0,360,58,90 $TFILE2 $TFILE
+   if [ "$NATIONAL" == "undef" ]; then
+	NATIONAL=""
+   fi
+elif  [ "$COORD" == "globe" ]; then
+   cdo -s $CUSTOMCMD $REMAPCMD seltimestep,$TIMESTEP -selname,$NCVAR  $IFILE $TFILE
+   if [ "$NATIONAL" == "undef" ]; then
+        NATIONAL=$NATIONALDEF
+   fi
+elif  [ "$COORD" == "antarctic" ]; then
+   cdo -s seltimestep,$TIMESTEP -selname,$NCVAR $IFILE $TFILE2
+   cdo -s $CUSTOMCMD -remapbic,r720x720  -sellonlatbox,0,360,-90,-58 $TFILE2 $TFILE
+   if [ "$NATIONAL" == "undef" ]; then
+	NATIONAL=""
+   fi
+elif  [ "$COORD" == "eurocordex" ] || [ $COORD == "eurocordex-ext" ]  || [ $COORD == "eurocordex-int" ]; then
+   cdo -s seltimestep,$TIMESTEP -selname,$NCVAR $IFILE $TFILE2
+   cdo -s $CUSTOMCMD $REMAPCMD  -sellonlatbox,-15,80,15,80 $TFILE2 $TFILE
+   if [ "$NATIONAL" == "undef" ]; then
+	NATIONAL=$NATIONALDEF
+   fi
+else
+#cdo -s $CUSTOMCMD $REMAPCMD -sellonlatbox,${COORD//\//,} -seltimestep,$TIMESTEP -selname,$NCVAR $IFILE $TFILE
+ cdo -s seltimestep,$TIMESTEP -selname,$NCVAR $IFILE $TFILE2
+ cdo -s $CUSTOMCMD $REMAPCMD -sellonlatbox,${COORD//\//,} $TFILE2 $TFILE
+   if [ "$NATIONAL" == "undef" ]; then
+	NATIONAL=$NATIONALDEF
+   fi
+fi
+
+if [ ! -n "$CMIN" ]; then
+    CMIN=`cdo -s output -fldmin  $TFILE`
+    CMIN=${CMIN// /} # Trim all spaces
+fi
+if [ ! -n "$CMAX" ]; then
+    CMAX=`cdo -s output -fldmax  $TFILE`
+    CMAX=${CMAX// /} # Trim all spaces
+fi
+if [ ! -n "$CSTEP2" ]; then
+    CSTEP2=`echo $CMAX $CMIN  | awk '{ printf "%8.3g", ( $1 - $2 ) / 5 }'`
+#    CSTEP2=`echo "( $CMAX - $CMIN ) / 5"|bc -l`
+    CSTEP2=${CSTEP2// /} # Trim all spaces
+fi
+if [ ! -n "$CSTEP" ]; then
+#    CSTEP=`echo "( $CMAX - $CMIN ) / 200"|bc -l`
+    CSTEP=`echo $CMAX $CMIN  | awk '{ printf "%8.3g", ( $1 - $2 ) / 200 }'`
+    CSTEP=${CSTEP// /} # Trim all spaces
+fi
+if [ ! -n "$UNITS" ]; then
+    UNITS=`ncdump -h $TFILE |grep ${NCVAR}:units| cut -d\" -f2`
+fi
+
+OFILE=${OOFILE}.ps
+
+if [ $DEBUG == 1 ]; then
+echo IFILE $IFILE
+echo OFILE $OFILE
+echo NCVAR $NCVAR
+echo UNITS $UNITS
+echo TITLE $TITLE
+echo CMIN CMAX CSTEP $CMIN $CMAX $CSTEP
+echo CSTEP2 $CSTEP2
+echo CMAP $CMAP
+echo COORD $COORD
+echo UNITS $UNITS
+echo GRID $GRID
+echo TIMESTEP $TIMESTEP
+echo NOCOLORBAR $NOCOLORBAR
+echo REMAP $REMAP
+echo EPSONLY $EPSONLY
+echo PNGONLY $PNGONLY
+echo NOCLOSE $NOCLOSE
+fi
+
+if [ $GMTVER = 5 ]; then
+gmtset FONT_TITLE $HEADER_FONT_SIZE,$FONT
+gmtset FONT_ANNOT_PRIMARY  $ANNOT_FONT_SIZE,$FONT
+else
+gmtset HEADER_FONT $FONT HEADER_FONT_SIZE $HEADER_FONT_SIZE
+gmtset ANNOT_FONT_PRIMARY $FONT ANNOT_FONT_SIZE_PRIMARY $ANNOT_FONT_SIZE
+fi
+
+gmtset COLOR_NAN $NANCOLOR
+
+if [ "$COORD" == "" ] || [ "$COORD" == "robinson" ]; then 
+#Robinson
+BASEMAP=" -P -Rd -JN0/6i  -X1.8i -Y2i "
+elif [ "$COORD" == "cylindrical" ] || [ "$COORD" == "lonlat" ] || [ "$COORD" == "latlon" ]; then 
+#Cylindrical equidistant
+BASEMAP=" -P -Rd -JQ0/6i   -X1.8i -Y2i "
+elif [ "$COORD" == "mollweide" ]; then 
+#Mollweide
+BASEMAP=" -P -Rd -JW0/6i   -X1.8i -Y2i "
+VSCALEOFF=-0.15
+elif [ "$COORD" == "globe" ]; then
+#Hemisphere map
+BASEMAP=" -P -R0/360/-90/90 -JG10/10/3.5i -X1.8i -Y2i  "
+VSCALEOFF=-0.15
+elif [ "$COORD" == "arctic" ]; then 
+BASEMAP=" -P -R0/360/60/90 -JA0/90/6i   -X1.8i -Y2i "
+elif [ "$COORD" == "antarctic" ]; then 
+BASEMAP=" -P -R0/360/-90/-60 -JA0/-90/6i   -X1.8i -Y2i "
+elif [ "$COORD" == "eurocordex-ext" ]; then
+BASEMAP=" -P  -R-11/19/73/67r -JOc-44.14/60.21/-162/39.25/6i  -X1.8i -Y2i "
+elif [ "$COORD" == "eurocordex" ]; then
+BASEMAP=" -P  -R-10/22.2/64.4/66.65r -JOc-44.14/60.21/-162/39.25/6i  -X1.8i -Y2i "
+elif [ "$COORD" == "eurocordex-int" ]; then
+BASEMAP=" -P  -R-7.75143766/31.3723888/40.673687/63.1693954r -JOc-44.14/60.21/-162/39.25/6i  -X1.8i -Y2i "
+else
+#Select region (cylindrical)
+#psbasemap -P  -R$COORD -JM6i  -X1.8i -Y2i -B${GRID}:."${TITLE}": -K >| $OFILE
+BASEMAP="-P  -R$COORD -JQ0/6i  -X1.8i -Y2i "
+fi
+
+if [ $CONTINUE -eq "0" ]; then 
+#psbasemap -P  -R$COORD -JQ0/6i  -X1.8i -Y2i -B${GRID}:."${TITLE}": -K >| $OFILE
+$GMTPRE psbasemap $BASEMAP -B${GRID}:."${TITLE}": -K >| $OFILE
+fi
+
+# Create colormap
+$GMTPRE makecpt -D -C${CMAP} -T${CMIN}/${CMAX}/${CSTEP} > zzz$$.cpt
+
+if [ $NOPLOT -eq "0" ]; then 
+if [ $CONTOUR -eq "0" ]; then 
+$GMTPRE grdimage ${TFILE}?${NCVAR} -R -J -Czzz$$.cpt -O -K >> $OFILE
+else
+$GMTPRE grd2xyz  ${IFILE}?${NCVAR} >xyz$$.txt
+$GMTPRE pscontour  xyz$$.txt -R  -J -Czzz$$.cpt -I  -O -K >> $OFILE
+fi
+fi
+
+if [ "$CONTOURLINES" != "" ]; then
+$GMTPRE grdcontour ${IFILE}?${NCVAR} -R -J -A$CONTOURLINES -O -K >> $OFILE
+fi
+
+#@echo grdcontour ${TFILE}?${NCVAR} -R -J -Czzz$$.cpt -O -K >> $OFILE
+#grdcontour ${TFILE}?${NCVAR} -R -J -Czzz$$.cpt -O -K >> $OFILE
+
+#grdcontour ${IFILE}?${NCVAR} -R -J -Czzz.cpt -O -K >> $OFILE
+#grdview  ${IFILE}?${NCVAR} -R  -J -Czzz.cpt -Qs -V -O -K >> $OFILE
+#grdview  ${IFILE}?${NCVAR} -R  -J -Czzz.cpt -Qm  -O -K >> $OFILE
+
+
+if [ $NOCOLORBAR -eq "0" ]; then 
+# Draw horizontal scale, ticks every 0.5 (-B05)
+#psscale -Czzz$$.cpt -D3.0i/-0.5i/5.0i/0.2ih -E -O  -B${CSTEP2}/:"$UNITS": -K   >> $OFILE
+$GMTPRE psscale -Czzz$$.cpt -D3.0i/${VSCALEOFF}i/5.0i/0.2ih -E -O  -B${CSTEP2}/:"$UNITS": -K   >> $OFILE
+fi
+
+$GMTPRE psbasemap  -P -R -J  -B${GRID} -O -K >> $OFILE
+# Draw national boundaries (-N) coastlines (-W), intermediate res (-Di)
+#pscoast -R -N1 -J -W3 -A0/1/1 -O -K -Dl >> $OFILE
+#pscoast -R -N1/3 -J -W4 -A0/1/1 -O -D${COASTDETAIL} >> $OFILE
+
+
+if [ "$VECTOR" != "" ]; then 
+
+   if [ "$VECTUNITS" == "" ]; then 
+      VECTUNITS="$UNITS"
+   fi
+
+   VECTSCALE=$( echo  "scale=8; 6./$VECTSCALE" | bc )
+   $GMTPRE grdvector $VECTOR?u $VECTOR?v -I2 -J -R -K -O -Q0.008i/0.06i/0.03in0.1i -Gblack -S${VECTSCALE} >> $OFILE
+
+   SCUNITVECT=$( echo  "scale=8; $REFVECT/$VECTSCALE" | bc ) 
+#   x-position  y-position  direction  length
+#psxy -R -J -D3.0i/${VSCALEOFF}i/5.0i/0.2i  -Sv0.008i/0.06i/0.03i -L -G0 -N -W1 -O -K   << EOF >> $OFILE
+VSCALEOFF=-0.2
+$GMTPRE psxy -R -J -D-0.3i/${VSCALEOFF}i  -Sv0.008i/0.06i/0.03i -L -G0 -N -W1 -O -K   << EOF >> $OFILE
+  0  0  0   $SCUNITVECT
+EOF
+VSCALEOFF=-0.3
+# PSTEXT Make text to overlay GMT plot
+# (x, y, size, angle, fontno, justify, text) see help gmt_plot
+#pstext -R -J  -D5.0i/${VSCALEOFF}i/5.0i/0.2i   -N -O  << EOF >> $OFILE
+$GMTPRE pstext -R -J  -D-0.3i/${VSCALEOFF}i   -N -O -K << EOF >> $OFILE
+  0  0  12 0 1 LT $REFVECT $VECTUNITS
+EOF
+#
+fi
+
+if [ "$TEXT" != "" ]; then
+  TEXTS=$( echo $TEXT | cut -f1 -d/ )
+  XX=$( echo $TEXT | cut -f2 -d/ )
+  YY=$( echo $TEXT | cut -f3 -d/ )
+  FS=$( echo $TEXT | cut -f4 -d/ )
+  $GMTPRE pstext -R -J  -N -O -K << EOF >> $OFILE
+  $XX $YY  $FS 0 1 LB $TEXTS
+EOF
+fi
+
+#$GMTPRE pscoast $SEA -R $NATIONAL -J -W1p -A$MINAREA/1/2 -O -D${COASTDETAIL} -K >> $OFILE
+$GMTPRE pscoast $SEA -R $NATIONAL -J -W1p -A$MINAREA/1/2 -O -D${COASTDETAIL} -K >> $OFILE
+
+#Decide if to close or not
+if [ $NOCLOSE == 1 ]; then 
+$GMTPRE psbasemap  -P -R -J  -B${GRID} -O -K >> $OFILE
+rm -f zzz$$.cpt xyz$$.txt $TFILE $TFILE2
+else
+$GMTPRE psbasemap  -P -R -J  -B${GRID} -O >> $OFILE
+############################################################
+# Convert to eps and to png (-A: boundingbox)
+if [ $EPSONLY -eq "0" ]; then 
+$GMTPRE ps2raster -A  -E$DENSITY -Tg $OFILE
+fi
+if [ $PNGONLY -eq "0" ]; then 
+$GMTPRE ps2raster -A -Te $OFILE
+mv ${OOFILE}.eps oofile$$.eps
+ps2epsi oofile$$.eps ${OOFILE}.eps
+rm oofile$$.eps
+fi
+rm -f zzz$$.cpt xyz$$.txt  $OFILE $TFILE $TFILE2
+fi   # if NOCLOSE
+
+# Clean up
+#rm testr.nc zzz.cpt $OFILE
+
