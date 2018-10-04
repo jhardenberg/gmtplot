@@ -483,6 +483,9 @@ EOF
 fi
 
 if [ "$TEXT" != "" ]; then
+if [ -f $TEXT ]; then
+  $GMTPRE pstext -R -J  -N -O -K < $TEXT >> $OFILE
+else
   TEXTS=$( echo $TEXT | cut -f1 -d/ )
   XX=$( echo $TEXT | cut -f2 -d/ )
   YY=$( echo $TEXT | cut -f3 -d/ )
@@ -490,6 +493,7 @@ if [ "$TEXT" != "" ]; then
   $GMTPRE pstext -R -J  -N -O -K << EOF >> $OFILE
   $XX $YY  $FS 0 1 LB $TEXTS
 EOF
+fi
 fi
 
 #$GMTPRE pscoast $SEA -R $NATIONAL -J -W1p -A$MINAREA/1/2 -O -D${COASTDETAIL} -K >> $OFILE
