@@ -180,6 +180,9 @@ if [ $# -lt 1 ] ; then
         -noplot 	Do NOT plot inputfile, useful to plot only contours or an empty map
         -nancolor string      Set color for NANs, eg. : -nancolor 128/128/128 (Default)
         -text string/X/Y/FS   Places a string at position X/Y with fontsize FS
+              filename        Multiple strings at positions specified in file
+                              Format: X Y fontsize angle font align string
+                              Example: 0 10  12 0 1 LB hello
         -sea color      Set wet areas (ocean) to color (e.g. -sea blue or -sea 0/0/255)
 
 Description: 
