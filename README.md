@@ -1,4 +1,4 @@
-# GMTPLOT 0.90
+# GMTplot0.90
 
  Creates a quick plot from a netcdf file using GMT and cdo
 
