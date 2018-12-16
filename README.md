@@ -1,13 +1,13 @@
-#GMTPLOT 0.90
+# GMTPLOT 0.90
 
  Creates a quick plot from a netcdf file using GMT and cdo
 
-##Dependencies
+## Dependencies
  -  [GMT](http://gmt.soest.hawaii.edu/)
  -  [cdo](https://code.zmaw.de/projects/cdo) 
  -  [ps2epsi](http://www.ghostscript.com/)
 
-##Description
+## Description
 
 The idea for this tool is to create quickly a 'first guess' plot of the contents of 
 a netcdf file. 
@@ -19,7 +19,7 @@ The options allow a certain degree of customization (they are limited on purpous
 If you need more and know how to use GMT you can modify this script to suit your needs or
 contribute to the project by adding more options.
 
-##Usage
+## Usage
 ```
 gmtplot inputfile outputprefix [options]
 
@@ -100,8 +100,10 @@ gmtplot inputfile outputprefix [options]
         -sea color      Set wet areas (ocean) to color (e.g. -sea blue or -sea 0/0/255)
 ```
 
-##Examples
+## Examples
+
     gmtplot test.nc myplot
+
 Default plot of first variable in test.nc using defaults. 
 Creates myplot.eps and myplot.png
 
@@ -110,11 +112,11 @@ Creates myplot.eps and myplot.png
 Plots TRMM rainfall over the Mediterranean using the "GMT_whiterain.cpt" 
 palette file, overriding some defaults.
 
-##Notes 
+## Notes 
 GMT appears to have problems with some datasets with a curvilinear grid, 
 such as those produced by some regional models.
 If this happens, you could first reinterpolate to a regular grid 
 using the -remap option. E.g. -remap 720/720
 
-##Contact
+## Contact
 (c) 2012-2016 Jost von Hardenberg (jvonhardenberg AT isac.cnr.it) - ISAC-CNR, Italy
