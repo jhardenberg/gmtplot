@@ -38,20 +38,18 @@ export LC_ALL=en_US.utf-8
 
 GMTVER=$(gmt --version 2>&1  | head -1 | cut -f 3 -d" "| cut -f 1 -d.)
 
+
 if [ $GMTVER == 5 ]; then
-GMTPRE=gmt
+GMTPRE=gmt 
 GMTDIR=$(which gmt)
 GMTDIR=${GMTDIR%/*}
 GMTDIR=${GMTDIR%/*}/share/cpt
 #PATH=/opt/gmt5/bin:$PATH
 NATIONALDEF="-N1/1p"
+
 else
-GMTPRE=
-GMTDIR=$(which gmt)
-GMTDIR=${GMTDIR%/*}
-GMTDIR=${GMTDIR%/*}/share/gmt4/cpt
-#GMTDIR=/usr/lib/gmt
-NATIONALDEF="-N1/3"
+echo gmtplot needs GMT>=5 !
+exit
 fi
 
 #NCVAR=tp
@@ -65,7 +63,7 @@ fi
 TFILE=temp$$.nc
 TFILE2=tempb$$.nc
 CMAP="rainbow"
-GRID=60g30
+GRID="-B60g30"
 COORD=""
 TIMESTEP=1
 REMAP=""
@@ -74,8 +72,9 @@ VSCALEOFF=-0.4
 COASTDETAIL=l
 NATIONAL="undef"
 DEBUG=0
-EPSONLY=0
-PNGONLY=0
+EPSONLY=1
+PNGONLY=1
+TIFONLY=0
 DENSITY=144
 CUSTOMCMD=""
 CONTOUR=0
@@ -95,10 +94,12 @@ CONTINUE=0
 NANCOLOR=128/128/128
 TEXT=""
 SEA=""
+INNER=""
+NOCOAST=0
 
 if [ $# -lt 1 ] ; then
 	cat << END
- gmtplot 0.87
+ gmtplot 0.90
  Creates a quick plot from a netcdf file using GMT and cdo
  Written by: Jost von Hardenberg <j.vonhardenberg@isac.cnr.it> 2012
 
@@ -155,6 +156,9 @@ if [ $# -lt 1 ] ; then
 			x1/x2/y1/y2  	Plot a selected region (cylindrical) 
 	-grid  X/Y 	Grid spacing in x and y direction. E.g. -grid 60/30.
 			Default: 60/30
+	-nonational	Do not plot national boundaries (default for global maps)
+	-national	Do plot national boundaries (default for regional maps)
+        -nocoast        Do not plot coasts, national boundaries
 	-coast string	Level of detail for coastlines: string=
 			c = coarse
 			l = low (default)
@@ -162,13 +166,12 @@ if [ $# -lt 1 ] ; then
 			h = high (not implemented)
 			f = full (not implemented)
         -minarea value	Minimum area of features in sq. Km (Default 2500)
-	-nonational	Do not plot national boundaries (default for global maps)
-	-national	Do plot national boundaries (default for regional maps)
 	-remap X/Y  	Remap to a regular grid with X and Y grid points in the 
 			longitudinal and latitudinal directions.
 			E.g.: "-remap 720/720" remaps to a r720x720 grid first
 	-eps		create only eps output graphic (default is both png and eps)
 	-png		create only png output graphic (default is both png and eps)
+	-tif 		create only geotiff output graphic (default is both png and eps)
 	-density value	Density in PPI for output png (default is 144)	
         -custom	string	Custom CDO command to apply to input field, e.g. -custom divc,3
 	-vector	file	Overlays vector plot from file. Default u and v component names are "u" and "v"
@@ -234,17 +237,21 @@ while [ $# -gt 0 ] ; do
 		-R) COORD=$2 ; shift 2 ;;
 		-proj) COORD=$2 ; shift 2 ;;
 		-units) UNITS=$2 ; shift 2 ;;
-		-grid) GRID=${2//\//g} ; shift 2 ;;
+		-nogrid) GRID="-Bp60g0"; shift 1 ;;
+		-grid) GRID="-B${2//\//g}" ; shift 2 ;;
 		-timestep) TIMESTEP=$2 ; shift 2 ;;
 		-nocolorbar) NOCOLORBAR=1 ; shift 1 ;;
-		-epsonly) EPSONLY=1 ; shift 1 ;;
-		-pngonly) PNGONLY=1 ; shift 1 ;;
+		-epsonly) EPSONLY=1 ; PNGONLY=0; shift 1 ;;
+		-pngonly) PNGONLY=1 ; EPSONLY=0; shift 1 ;;
+		-tifonly) TIFONLY=1 ; EPSONLY=0; shift 1 ;;
 		-nonational) NATIONAL="" ; shift 1 ;;
+		-nocoast) NOCOAST=1 ; shift 1 ;;
 		-national) NATIONAL=$NATIONALDEF ; shift 1 ;;
 		-remap) REMAP=${2//\//x} ; shift 2 ;;
 		-debug) DEBUG=1 ; shift 1 ;;
-		-eps) EPSONLY=1 ; shift 1 ;;
-		-png) PNGONLY=1 ; shift 1 ;;
+		-eps) EPSONLY=1 ; PNGONLY=0; shift 1 ;;
+		-png) PNGONLY=1 ; EPSONLY=0; shift 1 ;;
+		-tif) TIFONLY=1 ; EPSONLY=0; shift 1 ;;
 		-coast) COASTDETAIL=$2 ; shift 2 ;;
 		-density) DENSITY=$2 ; shift 2 ;;
 		-custom) CUSTOMCMD=$2 ; shift 2 ;;
@@ -261,6 +268,10 @@ while [ $# -gt 0 ] ; do
 		*) shift 1 ;;
 	esac
 done
+if [ $TIFONLY == 1 ]; then 
+    INNER="--MAP_FRAME_TYPE=inside"
+	echo $INNER
+fi
 
 if [ $NOPLOT == 1 ]; then 
     NOCOLORBAR=1
@@ -375,6 +386,7 @@ echo NOCOLORBAR $NOCOLORBAR
 echo REMAP $REMAP
 echo EPSONLY $EPSONLY
 echo PNGONLY $PNGONLY
+echo TIFONLY $TIFONLY
 echo NOCLOSE $NOCLOSE
 fi
 
@@ -420,7 +432,7 @@ fi
 
 if [ $CONTINUE -eq "0" ]; then 
 #psbasemap -P  -R$COORD -JQ0/6i  -X1.8i -Y2i -B${GRID}:."${TITLE}": -K >| $OFILE
-$GMTPRE psbasemap $BASEMAP -B${GRID}:."${TITLE}": -K >| $OFILE
+$GMTPRE psbasemap $BASEMAP $INNER ${GRID} -B+t"${TITLE}" -K >| $OFILE
 fi
 
 # Create colormap
@@ -447,13 +459,7 @@ fi
 #grdview  ${IFILE}?${NCVAR} -R  -J -Czzz.cpt -Qm  -O -K >> $OFILE
 
 
-if [ $NOCOLORBAR -eq "0" ]; then 
-# Draw horizontal scale, ticks every 0.5 (-B05)
-#psscale -Czzz$$.cpt -D3.0i/-0.5i/5.0i/0.2ih -E -O  -B${CSTEP2}/:"$UNITS": -K   >> $OFILE
-$GMTPRE psscale -Czzz$$.cpt -D3.0i/${VSCALEOFF}i/5.0i/0.2ih -E -O  -B${CSTEP2}/:"$UNITS": -K   >> $OFILE
-fi
-
-$GMTPRE psbasemap  -P -R -J  -B${GRID} -O -K >> $OFILE
+$GMTPRE psbasemap $INNER -P -R -J  ${GRID} -O -K >> $OFILE
 # Draw national boundaries (-N) coastlines (-W), intermediate res (-Di)
 #pscoast -R -N1 -J -W3 -A0/1/1 -O -K -Dl >> $OFILE
 #pscoast -R -N1/3 -J -W4 -A0/1/1 -O -D${COASTDETAIL} >> $OFILE
@@ -500,25 +506,44 @@ fi
 fi
 
 #$GMTPRE pscoast $SEA -R $NATIONAL -J -W1p -A$MINAREA/1/2 -O -D${COASTDETAIL} -K >> $OFILE
+if [ $NOCOAST -eq 0 ]; then
 $GMTPRE pscoast $SEA -R $NATIONAL -J -W1p -A$MINAREA/1/2 -O -D${COASTDETAIL} -K >> $OFILE
+fi
+
+if [ $NOCOLORBAR -eq "0" ]; then 
+# Draw horizontal scale, ticks every 0.5 (-B05)
+#psscale -Czzz$$.cpt -D3.0i/-0.5i/5.0i/0.2ih -E -O  -B${CSTEP2}/:"$UNITS": -K   >> $OFILE
+if [ "$INNER" != "" ]; then
+
+   VSCALEOFF=0.5
+   $GMTPRE psscale -Czzz$$.cpt -Dx2.5i/${VSCALEOFF}i+w4.6i/0.2i+h+e+jCM -O  -B${CSTEP2}/:"$UNITS": -K -F+g255/255/255 >> $OFILE
+else
+#$GMTPRE psscale -Czzz$$.cpt -D3.0i/${VSCALEOFF}i/5.0i/0.2ih -E -O  -B${CSTEP2}/:"$UNITS": -K >> $OFILE
+$GMTPRE psscale -Czzz$$.cpt -Dx3.0i/${VSCALEOFF}i+w5.0i/0.2i+h+e+jCM -O  -B${CSTEP2}/:"$UNITS": -K >> $OFILE
+fi
+fi
 
 #Decide if to close or not
 if [ $NOCLOSE == 1 ]; then 
-$GMTPRE psbasemap  -P -R -J  -B${GRID} -O -K >> $OFILE
+$GMTPRE psbasemap $INNER  -P -R -J  ${GRID} -O -K >> $OFILE
 rm -f zzz$$.cpt xyz$$.txt $TFILE $TFILE2
 else
-$GMTPRE psbasemap  -P -R -J  -B${GRID} -O >> $OFILE
+$GMTPRE psbasemap  $INNER -P -R -J  ${GRID} -O >> $OFILE
 ############################################################
 # Convert to eps and to png (-A: boundingbox)
-if [ $EPSONLY -eq "0" ]; then 
-$GMTPRE ps2raster -A  -E$DENSITY -Tg $OFILE
+if [ $PNGONLY -eq "1" ]; then 
+$GMTPRE psconvert -A  -E$DENSITY -Tg $OFILE
 fi
-if [ $PNGONLY -eq "0" ]; then 
-$GMTPRE ps2raster -A -Te $OFILE
+if [ $TIFONLY -eq "1" ]; then
+$GMTPRE psconvert -A -W+g -E$DENSITY -Tt $OFILE
+fi
+if [ $EPSONLY -eq "1" ]; then 
+$GMTPRE psconvert -A -Te $OFILE
 mv ${OOFILE}.eps oofile$$.eps
 ps2epsi oofile$$.eps ${OOFILE}.eps
 rm oofile$$.eps
 fi
+
 rm -f zzz$$.cpt xyz$$.txt  $OFILE $TFILE $TFILE2
 fi   # if NOCLOSE
 
