@@ -237,7 +237,7 @@ while [ $# -gt 0 ] ; do
 		-R) COORD=$2 ; shift 2 ;;
 		-proj) COORD=$2 ; shift 2 ;;
 		-units) UNITS=$2 ; shift 2 ;;
-		-nogrid) GRID="-Bp60g0"; shift 1 ;;
+		-nogrid) GRID="-Bp0g0"; shift 1 ;;
 		-grid) GRID="-B${2//\//g}" ; shift 2 ;;
 		-timestep) TIMESTEP=$2 ; shift 2 ;;
 		-nocolorbar) NOCOLORBAR=1 ; shift 1 ;;
@@ -515,7 +515,7 @@ if [ $NOCOLORBAR -eq "0" ]; then
 #psscale -Czzz$$.cpt -D3.0i/-0.5i/5.0i/0.2ih -E -O  -B${CSTEP2}/:"$UNITS": -K   >> $OFILE
 if [ "$INNER" != "" ]; then
 
-   VSCALEOFF=0.5
+   VSCALEOFF=0.43
    $GMTPRE psscale -Czzz$$.cpt -Dx2.5i/${VSCALEOFF}i+w4.6i/0.2i+h+e+jCM -O  -B${CSTEP2}/:"$UNITS": -K -F+g255/255/255 >> $OFILE
 else
 #$GMTPRE psscale -Czzz$$.cpt -D3.0i/${VSCALEOFF}i/5.0i/0.2ih -E -O  -B${CSTEP2}/:"$UNITS": -K >> $OFILE
