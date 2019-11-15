@@ -38,15 +38,13 @@ export LC_ALL=en_US.utf-8
 
 GMTVER=$(gmt --version 2>&1  | head -1 | cut -f 3 -d" "| cut -f 1 -d.)
 
-
-if [ $GMTVER == 5 ]; then
+if [ $GMTVER -ge 5 ]; then
 GMTPRE=gmt 
 GMTDIR=$(which gmt)
 GMTDIR=${GMTDIR%/*}
 GMTDIR=${GMTDIR%/*}/share/cpt
 #PATH=/opt/gmt5/bin:$PATH
 NATIONALDEF="-N1/1p"
-
 else
 echo gmtplot needs GMT>=5 !
 exit
