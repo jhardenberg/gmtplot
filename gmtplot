@@ -71,7 +71,7 @@ COORD=""
 TIMESTEP=1
 REMAP=""
 NOCOLORBAR=0
-VSCALEOFF=-0.4
+VSCALEOFF=-0.5
 COASTDETAIL=l
 NATIONAL="undef"
 DEBUG=0
@@ -89,6 +89,7 @@ FONT="Helvetica-Bold"
 MINAREA=2500
 VECTOR=""
 VECTSCALE=1
+VECTSPACE=2
 REFVECT=1
 VECTUNITS=""
 NOCLOSE=0
@@ -181,7 +182,8 @@ if [ $# -lt 1 ] ; then
 	-density value	Density in PPI for output png (default is 144)	
         -custom	string	Custom CDO command to apply to input field, e.g. -custom divc,3
 	-vector	file	Overlays vector plot from file. Default u and v component names are "u" and "v"
-	-vectorscale value  Scale for vector (Units: degrees/data units, default 1) 
+	-vectorscale value Scale for vector (Units: degrees/data units, default 1) 
+	-vectorspace value Vector spacing (Units: degrees; default 2 deg)
 	-refvector value  Modulus of vector plotted for reference  (Default: 1) 
         -vectorunits string  Units to label the reference vector (Default: -units)
         -keep	 	Do not close ps, another plot will follow (creates a .ps)
@@ -266,6 +268,7 @@ while [ $# -gt 0 ] ; do
 		-custom) CUSTOMCMD=$2 ; shift 2 ;;
 		-vector) VECTOR=$2 ; shift 2 ;;
 		-vectorscale) VECTSCALE=$2 ; shift 2 ;;
+		-vectorspace) VECTSPACE=$2 ; shift 2 ;;
 		-refvector) REFVECT=$2 ; shift 2 ;;
 		-vectorunits) VECTUNITS=$2 ; shift 2 ;;
 		-keep) NOCLOSE=1 ; shift 1 ;;
@@ -482,21 +485,24 @@ if [ "$VECTOR" != "" ]; then
    fi
 
    VECTSCALE=$( echo  "scale=8; 6./$VECTSCALE" | bc )
-   $GMTPRE grdvector $VECTOR?u $VECTOR?v -I2 -J -R -K -O -Q0.008i/0.06i/0.03in0.1i -Gblack -S${VECTSCALE} >> $OFILE
+   $GMTPRE grdvector $VECTOR?u $VECTOR?v -I$VECTSPACE -J -R -K -O -Q0.1i+eA+jb -Gblack -S${VECTSCALE} >> $OFILE
 
    SCUNITVECT=$( echo  "scale=8; $REFVECT/$VECTSCALE" | bc ) 
 #   x-position  y-position  direction  length
 #psxy -R -J -D3.0i/${VSCALEOFF}i/5.0i/0.2i  -Sv0.008i/0.06i/0.03i -L -G0 -N -W1 -O -K   << EOF >> $OFILE
-VSCALEOFF=-0.2
-$GMTPRE psxy -R -J -D-0.3i/${VSCALEOFF}i  -Sv0.008i/0.06i/0.03i -L -G0 -N -W1 -O -K   << EOF >> $OFILE
-  0  0  0   $SCUNITVECT
+MYVSCALEOFF=-0.6
+echo $SCUNITVECT
+$GMTPRE psxy -R -J -D-0.1i/${MYVSCALEOFF}i  -Sv0.008i/0.06i/0.03i -L -G0 -N -W1 -O -K   << EOF >> $OFILE
+#$GMTPRE psxy -R -J -D-0.3i/${MYVSCALEOFF}i  -Sv0.008i/0.06i/0.03i -L -G0 -N -W1 -O -K   << EOF >> $OFILE
+  7  30  0 $SCUNITVECT
 EOF
-VSCALEOFF=-0.3
 # PSTEXT Make text to overlay GMT plot
 # (x, y, size, angle, fontno, justify, text) see help gmt_plot
 #pstext -R -J  -D5.0i/${VSCALEOFF}i/5.0i/0.2i   -N -O  << EOF >> $OFILE
-$GMTPRE pstext -R -J  -D-0.3i/${VSCALEOFF}i   -N -O -K << EOF >> $OFILE
-  0  0  12 0 1 LT $REFVECT $VECTUNITS
+MYVSCALEOFF=-0.65
+#$GMTPRE pstext -R -J  -D-0.3i/${MYVSCALEOFF}i   -N -O -K << EOF >> $OFILE
+$GMTPRE pstext -R -J  -D-0.1i/${MYVSCALEOFF}i   -N -O -K << EOF >> $OFILE
+  7  30  12 0 1 LT $VECTUNITS
 EOF
 #
 fi
@@ -524,12 +530,10 @@ if [ $NOCOLORBAR -eq 0 ]; then
 # Draw horizontal scale, ticks every 0.5 (-B05)
 #psscale -Czzz$$.cpt -D3.0i/-0.5i/5.0i/0.2ih -E -O  -B${CSTEP2}/:"$UNITS": -K   >> $OFILE
 if [ "$INNER" != "" ]; then
-
-   VSCALEOFF=0.43
-   $GMTPRE psscale -Czzz$$.cpt -Dx2.5i/${VSCALEOFF}i+w4.6i/0.2i+h+e+jCM -O  -B${CSTEP2}/:"$UNITS": -K -F+g255/255/255 >> $OFILE
+   MYVSCALEOFF=0.43
+   $GMTPRE psscale -Czzz$$.cpt -Dx2.5i/${MYVSCALEOFF}i+w4.6i/0.2i+h+e+jCM -O  -B${CSTEP2}/:"$UNITS": -K -F+g255/255/255 >> $OFILE
 else
-#$GMTPRE psscale -Czzz$$.cpt -D3.0i/${VSCALEOFF}i/5.0i/0.2ih -E -O  -B${CSTEP2}/:"$UNITS": -K >> $OFILE
-$GMTPRE psscale -Czzz$$.cpt -Dx3.0i/${VSCALEOFF}i+w5.0i/0.2i+h+e+jCM -O  -B${CSTEP2}/:"$UNITS": -K >> $OFILE
+   $GMTPRE psscale -Czzz$$.cpt -Dx3.0i/${VSCALEOFF}i+w5.0i/0.2i+h+e+jCM -O  -B${CSTEP2}/:"$UNITS": -K >> $OFILE
 fi
 fi
 
