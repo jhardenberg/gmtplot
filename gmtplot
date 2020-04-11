@@ -564,5 +564,6 @@ rm -f zzz$$.cpt xyz$$.txt  $OFILE $TFILE $TFILE2
 fi   # if NOCLOSE
 
 # Clean up
+rm -f gmt.conf gmt.history
 #rm testr.nc zzz.cpt $OFILE
 
