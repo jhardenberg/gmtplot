@@ -1,6 +1,6 @@
 #!/bin/bash
 ##############################################################################
-## GMTPLOT 0.90
+## GMTPLOT
 ## Creates a quick plot from a netcdf file using GMT and cdo
 ## Written by: Jost von Hardenberg <j.vonhardenberg AT isac.cnr.it> 2012-2016
 ##
@@ -36,15 +36,20 @@
 export LANG=en_US.utf-8
 export LC_ALL=en_US.utf-8 
 
-GMTVER=$(gmt --version 2>&1  | head -1 | cut -f 3 -d" "| cut -f 1 -d.)
+GMTVER=$(gmt --version 2>&1  | tail -1 | cut -f 3 -d" "| cut -f 1 -d.)
 
 if [ $GMTVER -ge 5 ]; then
 GMTPRE=gmt 
 GMTDIR=$(which gmt)
 GMTDIR=${GMTDIR%/*}
-GMTDIR=${GMTDIR%/*}/share/cpt
+if [ -d "${GMTDIR%/*}/share/cpt" ]; then
+  GMTDIR=${GMTDIR%/*}/share/cpt
+else
+  GMTDIR=${GMTDIR%/*}/share/gmt/cpt
+fi
 #PATH=/opt/gmt5/bin:$PATH
 NATIONALDEF="-N1/1p"
+
 else
 echo gmtplot needs GMT>=5 !
 exit
@@ -94,6 +99,8 @@ TEXT=""
 SEA=""
 INNER=""
 NOCOAST=0
+TEXTSTYLE=""
+REVCMAP=""
 
 if [ $# -lt 1 ] ; then
 	cat << END
@@ -126,6 +133,7 @@ if [ $# -lt 1 ] ; then
        			Check 	http://geodynamics.usc.edu/~becker/igmt/data/schemes.pdf
 				http://soliton.vm.bytemark.co.uk/pub/cpt-city/gmt/index.html
 			Try string=whiterain for precipitation
+        -revcmap        Reverse colormap
         -listcmap       Lists available colormaps 
         -contour	Use filled contours instead of raster to plot image.
                         The contour interval is cstep
@@ -180,6 +188,8 @@ if [ $# -lt 1 ] ; then
         -continue	Continue open plot left by previous -keep
         -noplot 	Do NOT plot inputfile, useful to plot only contours or an empty map
         -nancolor string      Set color for NANs, eg. : -nancolor 128/128/128 (Default)
+        -textstyle style      A GMT style specification for the font in the format 
+                              [+a[angle]][+c[justify]][+f[font]][+j[justify]][+h|+l|+r[first] |+ttext|+z[format]]
         -text string/X/Y/FS   Places a string at position X/Y with fontsize FS
               filename        Multiple strings at positions specified in file
                               Format: X Y fontsize angle font align string
@@ -224,6 +234,7 @@ while [ $# -gt 0 ] ; do
 		-cstepbar) CSTEP2=$2 ; shift 2 ;;
 		-title) TITLE=$2 ; shift 2 ;;
 		-cmap) CMAP=$2 ; shift 2 ;;
+		-revcmap) REVCMAP="-Ic" ; shift 1 ;;
 		-contour) CONTOUR=1 ; shift 1 ;;
 		-contourlines) CONTOURLINES=$2 ; shift 2 ;;
                 -minarea) MINAREA=$2 ; shift 2 ;;
@@ -239,17 +250,17 @@ while [ $# -gt 0 ] ; do
 		-grid) GRID="-B${2//\//g}" ; shift 2 ;;
 		-timestep) TIMESTEP=$2 ; shift 2 ;;
 		-nocolorbar) NOCOLORBAR=1 ; shift 1 ;;
-		-epsonly) EPSONLY=1 ; PNGONLY=0; shift 1 ;;
-		-pngonly) PNGONLY=1 ; EPSONLY=0; shift 1 ;;
-		-tifonly) TIFONLY=1 ; EPSONLY=0; shift 1 ;;
+		-epsonly) EPSONLY=1 ; PNGONLY=0; EPSONLY=0 ; shift 1 ;;
+		-pngonly) PNGONLY=1 ; EPSONLY=0; TIFONLY=0 ;  shift 1 ;;
+		-tifonly) TIFONLY=1 ; EPSONLY=0; PNGONLY=0;  shift 1 ;;
 		-nonational) NATIONAL="" ; shift 1 ;;
 		-nocoast) NOCOAST=1 ; shift 1 ;;
 		-national) NATIONAL=$NATIONALDEF ; shift 1 ;;
 		-remap) REMAP=${2//\//x} ; shift 2 ;;
 		-debug) DEBUG=1 ; shift 1 ;;
-		-eps) EPSONLY=1 ; PNGONLY=0; shift 1 ;;
-		-png) PNGONLY=1 ; EPSONLY=0; shift 1 ;;
-		-tif) TIFONLY=1 ; EPSONLY=0; shift 1 ;;
+		-eps) EPSONLY=1 ; PNGONLY=0;  EPSONLY=0 ;shift 1 ;;
+		-png) PNGONLY=1 ; EPSONLY=0; TIFONLY=0 ; shift 1 ;;
+		-tif) TIFONLY=1 ; EPSONLY=0; PNGONLY=0; shift 1 ;;
 		-coast) COASTDETAIL=$2 ; shift 2 ;;
 		-density) DENSITY=$2 ; shift 2 ;;
 		-custom) CUSTOMCMD=$2 ; shift 2 ;;
@@ -261,6 +272,7 @@ while [ $# -gt 0 ] ; do
 		-continue) CONTINUE=1 ; shift 1 ;;
 		-noplot) NOPLOT=1 ; shift 1 ;;
 		-nancolor) NANCOLOR=$2 ; shift 2 ;;
+		-textstyle) TEXTSTYLE="-F$2" ; shift 2 ;;
 		-text) TEXT=$2 ; shift 2 ;;
 		-sea) SEA=$2 ; shift 2 ;;
 		*) shift 1 ;;
@@ -388,7 +400,7 @@ echo TIFONLY $TIFONLY
 echo NOCLOSE $NOCLOSE
 fi
 
-if [ $GMTVER -ge 5 ]; then
+if [ $GMTVER = 5 ]; then
 $GMTPRE gmtset FONT_TITLE $HEADER_FONT_SIZE,$FONT
 $GMTPRE gmtset FONT_ANNOT_PRIMARY  $ANNOT_FONT_SIZE,$FONT
 else
@@ -434,7 +446,7 @@ $GMTPRE psbasemap $BASEMAP $INNER ${GRID} -B+t"${TITLE}" -K >| $OFILE
 fi
 
 # Create colormap
-$GMTPRE makecpt -D -C${CMAP} -T${CMIN}/${CMAX}/${CSTEP} > zzz$$.cpt
+$GMTPRE makecpt -D -C${CMAP} -T${CMIN}/${CMAX}/${CSTEP} $REVCMAP > zzz$$.cpt
 
 if [ $NOPLOT -eq "0" ]; then 
 if [ $CONTOUR -eq "0" ]; then 
@@ -491,7 +503,7 @@ fi
 
 if [ "$TEXT" != "" ]; then
 if [ -f $TEXT ]; then
-  $GMTPRE pstext -R -J  -N -O -K < $TEXT >> $OFILE
+  $GMTPRE pstext $TEXTSTYLE -R -J  -N -O -K < $TEXT >> $OFILE
 else
   TEXTS=$( echo $TEXT | cut -f1 -d/ )
   XX=$( echo $TEXT | cut -f2 -d/ )
@@ -508,7 +520,7 @@ if [ $NOCOAST -eq 0 ]; then
 $GMTPRE pscoast $SEA -R $NATIONAL -J -W1p -A$MINAREA/1/2 -O -D${COASTDETAIL} -K >> $OFILE
 fi
 
-if [ $NOCOLORBAR -eq "0" ]; then 
+if [ $NOCOLORBAR -eq 0 ]; then 
 # Draw horizontal scale, ticks every 0.5 (-B05)
 #psscale -Czzz$$.cpt -D3.0i/-0.5i/5.0i/0.2ih -E -O  -B${CSTEP2}/:"$UNITS": -K   >> $OFILE
 if [ "$INNER" != "" ]; then
@@ -533,7 +545,9 @@ if [ $PNGONLY -eq "1" ]; then
 $GMTPRE psconvert -A  -E$DENSITY -Tg $OFILE
 fi
 if [ $TIFONLY -eq "1" ]; then
-$GMTPRE psconvert -A -W+g -E$DENSITY -Tt $OFILE
+$GMTPRE psconvert -E$DENSITY -A -W+g -E$DENSITY -Tt $OFILE
+rm $OOFILE.tif
+rm $OOFILE.tfw
 fi
 if [ $EPSONLY -eq "1" ]; then 
 $GMTPRE psconvert -A -Te $OFILE
