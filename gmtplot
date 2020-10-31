@@ -98,6 +98,7 @@ CONTINUE=0
 NANCOLOR=128/128/128
 TEXT=""
 SEA=""
+LAND=""
 INNER=""
 NOCOAST=0
 TEXTSTYLE=""
@@ -197,6 +198,7 @@ if [ $# -lt 1 ] ; then
                               Format: X Y fontsize angle font align string
                               Example: 0 10  12 0 1 LB hello
         -sea color      Set wet areas (ocean) to color (e.g. -sea blue or -sea 0/0/255)
+        -land color    Set land areas to color (e.g. -land brown or -land 128/0/0)
 
 Description: 
        This idea for this tool is to create quickly a 'first guess' plot of the contents of 
@@ -278,6 +280,7 @@ while [ $# -gt 0 ] ; do
 		-textstyle) TEXTSTYLE="-F$2" ; shift 2 ;;
 		-text) TEXT=$2 ; shift 2 ;;
 		-sea) SEA=$2 ; shift 2 ;;
+		-land) LAND=$2 ; shift 2 ;;
 		*) shift 1 ;;
 	esac
 done
@@ -313,6 +316,10 @@ fi
 
 if [ "$SEA" != "" ]; then
    SEA="-S$SEA"
+fi
+
+if [ "$LAND" != "" ]; then
+   LAND="-G$LAND"
 fi
 
 if [ ! -n "$NCVAR" ]; then
@@ -521,9 +528,9 @@ EOF
 fi
 fi
 
-#$GMTPRE pscoast $SEA -R $NATIONAL -J -W1p -A$MINAREA/1/2 -O -D${COASTDETAIL} -K >> $OFILE
+#$GMTPRE pscoast $SEA $LAND -R $NATIONAL -J -W1p -A$MINAREA/1/2 -O -D${COASTDETAIL} -K >> $OFILE
 if [ $NOCOAST -eq 0 ]; then
-$GMTPRE pscoast $SEA -R $NATIONAL -J -W1p -A$MINAREA/1/2 -O -D${COASTDETAIL} -K >> $OFILE
+$GMTPRE pscoast $SEA $LAND -R $NATIONAL -J -W1p -A$MINAREA/1/2 -O -D${COASTDETAIL} -K >> $OFILE
 fi
 
 if [ $NOCOLORBAR -eq 0 ]; then 
