@@ -6,7 +6,6 @@
 ##
 ## Dependencies: GMT (http://gmt.soest.hawaii.edu/)
 ## 		 cdo (https://code.zmaw.de/projects/cdo)
-##		 ps2epsi
 ## 
 ## MIT License
 ##
@@ -38,7 +37,6 @@ export LC_ALL=en_US.utf-8
 
 GMTVER=$(gmt --version 2>&1  | head -1 | cut -f 3 -d" "| cut -f 1 -d.)
 
-
 if [ $GMTVER == 5 ]; then
 GMTPRE=gmt 
 GMTDIR=$(which gmt)
@@ -48,7 +46,7 @@ GMTDIR=${GMTDIR%/*}/share/cpt
 NATIONALDEF="-N1/1p"
 
 else
-echo gmtplot needs GMT>=5 !
+echo "gmtplot needs GMT>=5 !"
 exit
 fi
 
@@ -510,7 +508,7 @@ if [ $NOCOAST -eq 0 ]; then
 $GMTPRE pscoast $SEA -R $NATIONAL -J -W1p -A$MINAREA/1/2 -O -D${COASTDETAIL} -K >> $OFILE
 fi
 
-if [ $NOCOLORBAR -eq "0" ]; then 
+if [ $NOCOLORBAR -eq 0 ]; then 
 # Draw horizontal scale, ticks every 0.5 (-B05)
 #psscale -Czzz$$.cpt -D3.0i/-0.5i/5.0i/0.2ih -E -O  -B${CSTEP2}/:"$UNITS": -K   >> $OFILE
 if [ "$INNER" != "" ]; then
@@ -539,9 +537,9 @@ $GMTPRE psconvert -A -W+g -E$DENSITY -Tt $OFILE
 fi
 if [ $EPSONLY -eq "1" ]; then 
 $GMTPRE psconvert -A -Te $OFILE
-mv ${OOFILE}.eps oofile$$.eps
-ps2epsi oofile$$.eps ${OOFILE}.eps
-rm oofile$$.eps
+#mv ${OOFILE}.eps oofile$$.eps
+#ps2epsi oofile$$.eps ${OOFILE}.eps
+#rm oofile$$.eps
 fi
 
 rm -f zzz$$.cpt xyz$$.txt  $OFILE $TFILE $TFILE2
