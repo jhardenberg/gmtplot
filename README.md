@@ -1,3 +1,4 @@
+![stand with Ukraine](https://badgen.net/badge/stand%20with/UKRAINE/?color=0057B8&labelColor=FFD700)
 # GMTplot
 
  Creates a quick plot from a netcdf file using GMT and cdo
